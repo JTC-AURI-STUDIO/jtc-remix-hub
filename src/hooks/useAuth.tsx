@@ -19,19 +19,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    let isMounted = true;
+    const loadingTimeout = window.setTimeout(() => {
+      if (isMounted) {
+        console.warn("Auth init timeout: proceeding without active session");
+        setLoading(false);
+      }
+    }, 8000);
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    const initializeSession = async () => {
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
 
-    return () => subscription.unsubscribe();
+        if (!isMounted) return;
+
+        if (error) {
+          console.error("Error loading auth session:", error);
+          setSession(null);
+          setUser(null);
+          return;
+        }
+
+        setSession(session);
+        setUser(session?.user ?? null);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error("Network error loading auth session:", error);
+        setSession(null);
+        setUser(null);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    void initializeSession();
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(loadingTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, displayName?: string) => {
