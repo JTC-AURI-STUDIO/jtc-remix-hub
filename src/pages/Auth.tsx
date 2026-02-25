@@ -18,6 +18,16 @@ export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const getAuthErrorMessage = (error: unknown) => {
+    const message = error instanceof Error ? error.message : "Erro inesperado ao autenticar";
+
+    if (message.includes("Failed to fetch")) {
+      return "Falha de conexão com o servidor de autenticação. Verifique sua internet, VPN/proxy ou DNS e tente novamente.";
+    }
+
+    return message;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -30,10 +40,10 @@ export default function Auth() {
         toast({ title: "Conta criada!" });
         navigate("/");
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Erro",
-        description: error.message,
+        description: getAuthErrorMessage(error),
         variant: "destructive",
       });
     } finally {
